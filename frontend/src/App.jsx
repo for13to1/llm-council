@@ -189,11 +189,17 @@ function App() {
     } catch (error) {
       console.error('Failed to send message:', error);
       setErrorMessage(error.message || 'Failed to send message');
-      // Remove optimistic messages on error
-      setCurrentConversation((prev) => ({
-        ...prev,
-        messages: prev.messages.slice(0, -2),
-      }));
+      // Remove optimistic messages on error (user + assistant pair)
+      setCurrentConversation((prev) => {
+        const messages = [...prev.messages];
+        if (messages.length >= 2 && messages[messages.length - 1].role === 'assistant') {
+          messages.pop();
+        }
+        if (messages.length >= 1 && messages[messages.length - 1].role === 'user') {
+          messages.pop();
+        }
+        return { ...prev, messages };
+      });
       setIsLoading(false);
     } finally {
       setIsLoading(false);

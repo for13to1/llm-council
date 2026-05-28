@@ -288,9 +288,11 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
     is_first_message = len(conversation["messages"]) == 0
 
     async def event_generator():
+        user_message_added = False
         try:
             # Add user message
             storage.add_user_message(conversation_id, request.content)
+            user_message_added = True
 
             # Start title generation in parallel (don't await yet)
             title_task = None
@@ -333,6 +335,16 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
             yield f"data: {json.dumps({'type': 'complete'})}\n\n"
 
         except Exception as e:
+            # Rollback: remove orphaned user message if assistant message was never saved
+            if user_message_added:
+                try:
+                    conversation = storage.get_conversation(conversation_id)
+                    if conversation and conversation["messages"] and conversation["messages"][-1]["role"] == "user":
+                        conversation["messages"].pop()
+                        storage.save_conversation(conversation)
+                except Exception:
+                    pass
+
             # Send error event
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
 
