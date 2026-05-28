@@ -1,19 +1,27 @@
 """FastAPI backend for LLM Council."""
 
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import StreamingResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
-from fastapi.staticfiles import StaticFiles
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import List, Dict, Any, Optional
-import uuid
-import json
 import asyncio
+import json
+import uuid
+from typing import Any
+
 import mistune
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
 
 from . import storage
-from .council import run_full_council, generate_conversation_title, stage1_collect_responses, stage2_collect_rankings, stage3_synthesize_final, calculate_aggregate_rankings
+from .council import (
+    calculate_aggregate_rankings,
+    generate_conversation_title,
+    run_full_council,
+    stage1_collect_responses,
+    stage2_collect_rankings,
+    stage3_synthesize_final,
+)
 
 app = FastAPI(title="LLM Council API")
 
@@ -32,31 +40,32 @@ templates = Jinja2Templates(directory="backend/templates")
 
 # --- Helper functions ---
 
+
 def short_model_name(model: str) -> str:
-    return model.split('/')[1] if '/' in model else model
+    return model.split("/")[1] if "/" in model else model
 
 
 def render_markdown(text: str) -> str:
     return mistune.html(text)
 
 
-def de_anonymize_text(text: str, label_to_model: Optional[Dict[str, str]]) -> str:
+def de_anonymize_text(text: str, label_to_model: dict[str, str] | None) -> str:
     if not label_to_model:
         return text
     result = text
     for label, model in label_to_model.items():
         name = short_model_name(model)
-        result = result.replace(label, f'**{name}**')
+        result = result.replace(label, f"**{name}**")
     return result
 
 
-def resolve_parsed_ranking(parsed_ranking: List[str], label_to_model: Optional[Dict[str, str]]) -> List[str]:
+def resolve_parsed_ranking(parsed_ranking: list[str], label_to_model: dict[str, str] | None) -> list[str]:
     if not label_to_model:
         return parsed_ranking
     return [short_model_name(label_to_model.get(label, label)) for label in parsed_ranking]
 
 
-def prepare_messages_for_template(messages: List[Dict[str, Any]]) -> Dict[int, Dict[str, Any]]:
+def prepare_messages_for_template(messages: list[dict[str, Any]]) -> dict[int, dict[str, Any]]:
     """Pre-process messages for server-side rendering. Returns dict keyed by message index."""
     processed = {}
     for idx, msg in enumerate(messages):
@@ -66,8 +75,7 @@ def prepare_messages_for_template(messages: List[Dict[str, Any]]) -> Dict[int, D
                 "content_html": render_markdown(msg["content"]),
             }
         else:
-            p = {"role": "assistant", "stage1": None, "stage2": None, "stage3": None,
-                 "aggregate_rankings": None}
+            p = {"role": "assistant", "stage1": None, "stage2": None, "stage3": None, "aggregate_rankings": None}
 
             if msg.get("stage1"):
                 p["stage1"] = [
@@ -86,13 +94,9 @@ def prepare_messages_for_template(messages: List[Dict[str, Any]]) -> Dict[int, D
                     {
                         "model": r["model"],
                         "short_name": short_model_name(r["model"]),
-                        "ranking_html": render_markdown(
-                            de_anonymize_text(r["ranking"], label_to_model)
-                        ),
+                        "ranking_html": render_markdown(de_anonymize_text(r["ranking"], label_to_model)),
                         "parsed_ranking": r.get("parsed_ranking", []),
-                        "label_resolved": resolve_parsed_ranking(
-                            r.get("parsed_ranking", []), label_to_model
-                        ),
+                        "label_resolved": resolve_parsed_ranking(r.get("parsed_ranking", []), label_to_model),
                     }
                     for r in msg["stage2"]
                 ]
@@ -121,18 +125,22 @@ def prepare_messages_for_template(messages: List[Dict[str, Any]]) -> Dict[int, D
 
 # --- Pydantic models ---
 
+
 class CreateConversationRequest(BaseModel):
     """Request to create a new conversation."""
+
     pass
 
 
 class SendMessageRequest(BaseModel):
     """Request to send a message in a conversation."""
+
     content: str
 
 
 class ConversationMetadata(BaseModel):
     """Conversation metadata for list view."""
+
     id: str
     created_at: str
     title: str
@@ -141,22 +149,28 @@ class ConversationMetadata(BaseModel):
 
 class Conversation(BaseModel):
     """Full conversation with all messages."""
+
     id: str
     created_at: str
     title: str
-    messages: List[Dict[str, Any]]
+    messages: list[dict[str, Any]]
 
 
 # --- Page routes ---
+
 
 @app.get("/")
 async def root(request: Request):
     """Landing page."""
     conversations = storage.list_conversations()
-    return templates.TemplateResponse(request, "index.html", {
-        "conversations": conversations,
-        "active_conversation_id": None,
-    })
+    return templates.TemplateResponse(
+        request,
+        "index.html",
+        {
+            "conversations": conversations,
+            "active_conversation_id": None,
+        },
+    )
 
 
 @app.get("/new")
@@ -178,24 +192,33 @@ async def view_conversation(request: Request, conversation_id: str):
 
     if len(conversation["messages"]) == 0:
         # Empty conversation — show input form
-        return templates.TemplateResponse(request, "index.html", {
-            "conversations": conversations,
-            "active_conversation_id": conversation_id,
-        })
+        return templates.TemplateResponse(
+            request,
+            "index.html",
+            {
+                "conversations": conversations,
+                "active_conversation_id": conversation_id,
+            },
+        )
 
     processed_messages = prepare_messages_for_template(conversation["messages"])
 
-    return templates.TemplateResponse(request, "conversation.html", {
-        "conversations": conversations,
-        "active_conversation_id": conversation_id,
-        "conversation": conversation,
-        "processed_messages": processed_messages,
-    })
+    return templates.TemplateResponse(
+        request,
+        "conversation.html",
+        {
+            "conversations": conversations,
+            "active_conversation_id": conversation_id,
+            "conversation": conversation,
+            "processed_messages": processed_messages,
+        },
+    )
 
 
 # --- API routes ---
 
-@app.get("/api/conversations", response_model=List[ConversationMetadata])
+
+@app.get("/api/conversations", response_model=list[ConversationMetadata])
 async def list_conversations():
     """List all conversations (metadata only)."""
     return storage.list_conversations()
@@ -241,9 +264,7 @@ async def send_message(conversation_id: str, request: SendMessageRequest):
         storage.update_conversation_title(conversation_id, title)
 
     # Run the 3-stage council process
-    stage1_results, stage2_results, stage3_result, metadata = await run_full_council(
-        request.content
-    )
+    stage1_results, stage2_results, stage3_result, metadata = await run_full_council(request.content)
 
     # Add assistant message with all stages
     storage.add_assistant_message(
@@ -256,12 +277,7 @@ async def send_message(conversation_id: str, request: SendMessageRequest):
     )
 
     # Return the complete response with metadata
-    return {
-        "stage1": stage1_results,
-        "stage2": stage2_results,
-        "stage3": stage3_result,
-        "metadata": metadata
-    }
+    return {"stage1": stage1_results, "stage2": stage2_results, "stage3": stage3_result, "metadata": metadata}
 
 
 @app.delete("/api/conversations/{conversation_id}")
@@ -354,10 +370,11 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-        }
+        },
     )
 
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8001)

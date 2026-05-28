@@ -1,7 +1,8 @@
 """Configuration for the LLM Council."""
 
 import os
-from typing import Dict, List, Any, Union
+from typing import Any
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -15,7 +16,7 @@ OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 # --- Direct mode provider configs ---
 # Each provider needs: base_url, api_key_env (empty string = no auth), optional extra_headers
-DIRECT_PROVIDERS: Dict[str, Dict[str, Any]] = {
+DIRECT_PROVIDERS: dict[str, dict[str, Any]] = {
     "openai": {
         "base_url": "https://api.openai.com/v1/chat/completions",
         "api_key_env": "OPENAI_API_KEY",
@@ -48,16 +49,16 @@ DIRECT_PROVIDERS: Dict[str, Dict[str, Any]] = {
 # Direct mode: list of dicts like {"provider": "openai", "model": "gpt-5.1"}
 #
 # --- Default (OpenRouter) ---
-COUNCIL_MODELS: List[Union[str, Dict[str, str]]] = [
+COUNCIL_MODELS: list[str | dict[str, str]] = [
     "openai/gpt-5.1",
     "google/gemini-3-pro-preview",
     "anthropic/claude-sonnet-4.5",
     "x-ai/grok-4",
 ]
 
-CHAIRMAN_MODEL: Union[str, Dict[str, str]] = "google/gemini-3-pro-preview"
+CHAIRMAN_MODEL: str | dict[str, str] = "google/gemini-3-pro-preview"
 
-TITLE_MODEL: Union[str, Dict[str, str]] = "google/gemini-2.5-flash"
+TITLE_MODEL: str | dict[str, str] = "google/gemini-2.5-flash"
 
 # --- Local Ollama example (set PROVIDER_MODE=direct in .env to use) ---
 # COUNCIL_MODELS = [
@@ -71,7 +72,7 @@ TITLE_MODEL: Union[str, Dict[str, str]] = "google/gemini-2.5-flash"
 DATA_DIR = "data/conversations"
 
 
-def model_display_name(model: Union[str, Dict[str, str]]) -> str:
+def model_display_name(model: str | dict[str, str]) -> str:
     """Convert a model identifier to a display-friendly string."""
     if isinstance(model, dict):
         return f"{model['provider']}/{model['model']}"

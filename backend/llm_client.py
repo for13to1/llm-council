@@ -1,15 +1,20 @@
 """LLM client supporting multiple provider modes."""
 
 import os
+from typing import Any
+
 import httpx
-from typing import List, Dict, Any, Optional, Union
+
 from .config import (
-    PROVIDER_MODE, OPENROUTER_API_KEY, OPENROUTER_API_URL,
-    DIRECT_PROVIDERS, model_display_name,
+    DIRECT_PROVIDERS,
+    OPENROUTER_API_KEY,
+    OPENROUTER_API_URL,
+    PROVIDER_MODE,
+    model_display_name,
 )
 
 
-def resolve_provider(model: Union[str, Dict[str, str]]) -> Dict[str, Any]:
+def resolve_provider(model: str | dict[str, str]) -> dict[str, Any]:
     """
     Resolve API endpoint, key, and headers for a model.
 
@@ -30,7 +35,7 @@ def resolve_provider(model: Union[str, Dict[str, str]]) -> Dict[str, Any]:
         if isinstance(model, str):
             raise ValueError(
                 f"Direct mode requires dict model identifiers, got string: {model}. "
-                f"Use {{\"provider\": \"...\", \"model\": \"...\"}} format."
+                f'Use {{"provider": "...", "model": "..."}} format.'
             )
         provider_name = model["provider"]
         if provider_name not in DIRECT_PROVIDERS:
@@ -49,10 +54,8 @@ def resolve_provider(model: Union[str, Dict[str, str]]) -> Dict[str, Any]:
 
 
 async def query_model(
-    model: Union[str, Dict[str, str]],
-    messages: List[Dict[str, str]],
-    timeout: float = 120.0
-) -> Optional[Dict[str, Any]]:
+    model: str | dict[str, str], messages: list[dict[str, str]], timeout: float = 120.0
+) -> dict[str, Any] | None:
     """
     Query a single model via its provider API.
 
@@ -84,20 +87,13 @@ async def query_model(
 
     try:
         async with httpx.AsyncClient(timeout=timeout) as client:
-            response = await client.post(
-                provider["url"],
-                headers=headers,
-                json=payload
-            )
+            response = await client.post(provider["url"], headers=headers, json=payload)
             response.raise_for_status()
 
             data = response.json()
-            message = data['choices'][0]['message']
+            message = data["choices"][0]["message"]
 
-            return {
-                'content': message.get('content'),
-                'reasoning_details': message.get('reasoning_details')
-            }
+            return {"content": message.get("content"), "reasoning_details": message.get("reasoning_details")}
 
     except Exception as e:
         print(f"Error querying model {model_display_name(model)}: {e}")
@@ -105,9 +101,8 @@ async def query_model(
 
 
 async def query_models_parallel(
-    models: List[Union[str, Dict[str, str]]],
-    messages: List[Dict[str, str]]
-) -> Dict[str, Optional[Dict[str, Any]]]:
+    models: list[str | dict[str, str]], messages: list[dict[str, str]]
+) -> dict[str, dict[str, Any] | None]:
     """
     Query multiple models in parallel.
 
@@ -123,4 +118,4 @@ async def query_models_parallel(
     tasks = [query_model(model, messages) for model in models]
     responses = await asyncio.gather(*tasks)
 
-    return {model_display_name(model): response for model, response in zip(models, responses)}
+    return {model_display_name(model): response for model, response in zip(models, responses, strict=True)}
