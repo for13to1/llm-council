@@ -1,28 +1,113 @@
 """FastAPI backend for LLM Council."""
 
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import StreamingResponse, RedirectResponse
+from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import uuid
 import json
 import asyncio
+import mistune
 
 from . import storage
 from .council import run_full_council, generate_conversation_title, stage1_collect_responses, stage2_collect_rankings, stage3_synthesize_final, calculate_aggregate_rankings
 
 app = FastAPI(title="LLM Council API")
 
-# Enable CORS for local development
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Static files and templates
+app.mount("/static", StaticFiles(directory="backend/static"), name="static")
+templates = Jinja2Templates(directory="backend/templates")
 
+
+# --- Helper functions ---
+
+def short_model_name(model: str) -> str:
+    return model.split('/')[1] if '/' in model else model
+
+
+def render_markdown(text: str) -> str:
+    return mistune.html(text)
+
+
+def de_anonymize_text(text: str, label_to_model: Optional[Dict[str, str]]) -> str:
+    if not label_to_model:
+        return text
+    result = text
+    for label, model in label_to_model.items():
+        name = short_model_name(model)
+        result = result.replace(label, f'**{name}**')
+    return result
+
+
+def resolve_parsed_ranking(parsed_ranking: List[str], label_to_model: Optional[Dict[str, str]]) -> List[str]:
+    if not label_to_model:
+        return parsed_ranking
+    return [short_model_name(label_to_model.get(label, label)) for label in parsed_ranking]
+
+
+def prepare_messages_for_template(messages: List[Dict[str, Any]]) -> Dict[int, Dict[str, Any]]:
+    """Pre-process messages for server-side rendering. Returns dict keyed by message index."""
+    processed = {}
+    for idx, msg in enumerate(messages):
+        if msg["role"] == "user":
+            continue
+        else:
+            p = {"role": "assistant", "stage1": None, "stage2": None, "stage3": None,
+                 "aggregate_rankings": None}
+
+            if msg.get("stage1"):
+                p["stage1"] = [
+                    {
+                        "model": r["model"],
+                        "short_name": short_model_name(r["model"]),
+                        "response_html": render_markdown(r["response"]),
+                    }
+                    for r in msg["stage1"]
+                ]
+
+            label_to_model = msg.get("label_to_model")
+
+            if msg.get("stage2"):
+                p["stage2"] = [
+                    {
+                        "model": r["model"],
+                        "short_name": short_model_name(r["model"]),
+                        "ranking_html": render_markdown(
+                            de_anonymize_text(r["ranking"], label_to_model)
+                        ),
+                        "parsed_ranking": r.get("parsed_ranking", []),
+                        "label_resolved": resolve_parsed_ranking(
+                            r.get("parsed_ranking", []), label_to_model
+                        ),
+                    }
+                    for r in msg["stage2"]
+                ]
+
+            if msg.get("stage3"):
+                p["stage3"] = {
+                    "model": msg["stage3"]["model"],
+                    "short_name": short_model_name(msg["stage3"]["model"]),
+                    "response_html": render_markdown(msg["stage3"]["response"]),
+                }
+
+            if msg.get("aggregate_rankings"):
+                p["aggregate_rankings"] = [
+                    {
+                        "model": a["model"],
+                        "short_name": short_model_name(a["model"]),
+                        "average_rank": a["average_rank"],
+                        "rankings_count": a["rankings_count"],
+                    }
+                    for a in msg["aggregate_rankings"]
+                ]
+
+            processed[idx] = p
+    return processed
+
+
+# --- Pydantic models ---
 
 class CreateConversationRequest(BaseModel):
     """Request to create a new conversation."""
@@ -50,11 +135,56 @@ class Conversation(BaseModel):
     messages: List[Dict[str, Any]]
 
 
-@app.get("/")
-async def root():
-    """Health check endpoint."""
-    return {"status": "ok", "service": "LLM Council API"}
+# --- Page routes ---
 
+@app.get("/")
+async def root(request: Request):
+    """Landing page."""
+    conversations = storage.list_conversations()
+    return templates.TemplateResponse("index.html", {
+        "request": request,
+        "conversations": conversations,
+        "active_conversation_id": None,
+    })
+
+
+@app.get("/new")
+async def new_conversation_page():
+    """Create a new conversation and redirect to it."""
+    conversation_id = str(uuid.uuid4())
+    storage.create_conversation(conversation_id)
+    return RedirectResponse(url=f"/conversations/{conversation_id}", status_code=303)
+
+
+@app.get("/conversations/{conversation_id}")
+async def view_conversation(request: Request, conversation_id: str):
+    """View a specific conversation."""
+    conversation = storage.get_conversation(conversation_id)
+    if conversation is None:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    conversations = storage.list_conversations()
+
+    if len(conversation["messages"]) == 0:
+        # Empty conversation — show input form
+        return templates.TemplateResponse("index.html", {
+            "request": request,
+            "conversations": conversations,
+            "active_conversation_id": conversation_id,
+        })
+
+    processed_messages = prepare_messages_for_template(conversation["messages"])
+
+    return templates.TemplateResponse("conversation.html", {
+        "request": request,
+        "conversations": conversations,
+        "active_conversation_id": conversation_id,
+        "conversation": conversation,
+        "processed_messages": processed_messages,
+    })
+
+
+# --- API routes ---
 
 @app.get("/api/conversations", response_model=List[ConversationMetadata])
 async def list_conversations():
@@ -111,7 +241,9 @@ async def send_message(conversation_id: str, request: SendMessageRequest):
         conversation_id,
         stage1_results,
         stage2_results,
-        stage3_result
+        stage3_result,
+        label_to_model=metadata.get("label_to_model"),
+        aggregate_rankings=metadata.get("aggregate_rankings"),
     )
 
     # Return the complete response with metadata
@@ -169,12 +301,14 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                 storage.update_conversation_title(conversation_id, title)
                 yield f"data: {json.dumps({'type': 'title_complete', 'data': {'title': title}})}\n\n"
 
-            # Save complete assistant message
+            # Save complete assistant message with metadata
             storage.add_assistant_message(
                 conversation_id,
                 stage1_results,
                 stage2_results,
-                stage3_result
+                stage3_result,
+                label_to_model=label_to_model,
+                aggregate_rankings=aggregate_rankings,
             )
 
             # Send completion event

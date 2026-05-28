@@ -1,0 +1,18 @@
+<div class="sidebar">
+    <div class="sidebar-header">
+        <h1>LLM Council</h1>
+        <a href="/new" class="new-conversation-btn">+ New Conversation</a>
+    </div>
+    <div class="conversation-list">
+        {% if conversations %}
+            {% for conv in conversations %}
+            <a href="/conversations/{{ conv.id }}" class="conversation-item {% if conv.id == active_conversation_id %}active{% endif %}" data-id="{{ conv.id }}">
+                <div class="conversation-title" id="sidebar-title-{{ conv.id }}">{{ conv.title or 'New Conversation' }}</div>
+                <div class="conversation-meta">{{ conv.message_count }} messages</div>
+            </a>
+            {% endfor %}
+        {% else %}
+            <div class="no-conversations">No conversations yet</div>
+        {% endif %}
+    </div>
+</div>

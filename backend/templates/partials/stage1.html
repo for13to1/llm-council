@@ -1,0 +1,14 @@
+<div class="stage stage1">
+    <h3 class="stage-title">Stage 1: Individual Responses</h3>
+    <div class="tabs">
+        {% for resp in stage1_responses %}
+        <button class="tab {% if loop.first %}active{% endif %}" data-stage="stage1" data-tab="{{ loop.index0 }}">{{ resp.short_name }}</button>
+        {% endfor %}
+    </div>
+    {% for resp in stage1_responses %}
+    <div class="tab-content {% if not loop.first %}hidden{% endif %}" data-stage="stage1" data-tab-index="{{ loop.index0 }}">
+        <div class="model-name">{{ resp.model }}</div>
+        <div class="response-text markdown-content">{{ resp.response_html | safe }}</div>
+    </div>
+    {% endfor %}
+</div>

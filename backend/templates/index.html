@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block content %}
+    {% include "partials/sidebar.html" %}
+    <div class="chat-interface">
+        {% if active_conversation_id %}
+        <div class="messages-container" data-conversation-id="{{ active_conversation_id }}">
+            <div class="empty-state">
+                <h2>Start a conversation</h2>
+                <p>Ask a question to consult the LLM Council</p>
+            </div>
+        </div>
+        <form class="input-form" data-conversation-id="{{ active_conversation_id }}">
+            <textarea class="message-input" placeholder="Ask your question..." rows="3"></textarea>
+            <button type="submit" class="send-button">Send</button>
+        </form>
+        {% else %}
+        <div class="messages-container">
+            <div class="empty-state">
+                <h2>Welcome to LLM Council</h2>
+                <p>Create a new conversation to get started</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+{% endblock %}

@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block content %}
+    {% include "partials/sidebar.html" %}
+    <div class="chat-interface">
+        <div class="messages-container" data-conversation-id="{{ conversation.id }}">
+            {% for msg in conversation.messages %}
+            <div class="message-group">
+                {% if msg.role == "user" %}
+                <div class="user-message">
+                    <div class="message-label">You</div>
+                    <div class="message-content">
+                        <div class="markdown-content">{{ msg.content }}</div>
+                    </div>
+                </div>
+                {% else %}
+                <div class="assistant-message">
+                    <div class="message-label">LLM Council</div>
+                    {% set pdata = processed_messages[loop.index0] %}
+                    {% if pdata and pdata.stage1 %}
+                        {% with stage1_responses=pdata.stage1 %}
+                            {% include "partials/stage1.html" %}
+                        {% endwith %}
+                    {% endif %}
+                    {% if pdata and pdata.stage2 %}
+                        {% with stage2_rankings=pdata.stage2,
+                               aggregate_rankings=pdata.aggregate_rankings %}
+                            {% include "partials/stage2.html" %}
+                        {% endwith %}
+                    {% endif %}
+                    {% if pdata and pdata.stage3 %}
+                        {% with stage3_result=pdata.stage3 %}
+                            {% include "partials/stage3.html" %}
+                        {% endwith %}
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        <form class="input-form" data-conversation-id="{{ conversation.id }}">
+            <textarea class="message-input" placeholder="Ask a follow-up..." rows="3"></textarea>
+            <button type="submit" class="send-button">Send</button>
+        </form>
+    </div>
+{% endblock %}

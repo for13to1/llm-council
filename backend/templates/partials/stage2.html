@@ -1,0 +1,51 @@
+<div class="stage stage2">
+    <h3 class="stage-title">Stage 2: Peer Rankings</h3>
+
+    <h4>Raw Evaluations</h4>
+    <p class="stage-description">
+        Each model evaluated all responses (anonymized as Response A, B, C, etc.) and provided rankings.
+        Below, model names are shown in <strong>bold</strong> for readability, but the original evaluation used anonymous labels.
+    </p>
+
+    <div class="tabs">
+        {% for rank in stage2_rankings %}
+        <button class="tab {% if loop.first %}active{% endif %}" data-stage="stage2" data-tab="{{ loop.index0 }}">{{ rank.short_name }}</button>
+        {% endfor %}
+    </div>
+
+    {% for rank in stage2_rankings %}
+    <div class="tab-content {% if not loop.first %}hidden{% endif %}" data-stage="stage2" data-tab-index="{{ loop.index0 }}">
+        <div class="ranking-model">{{ rank.model }}</div>
+        <div class="ranking-content markdown-content">{{ rank.ranking_html | safe }}</div>
+        {% if rank.parsed_ranking %}
+        <div class="parsed-ranking">
+            <strong>Extracted Ranking:</strong>
+            <ol>
+                {% for label in rank.parsed_ranking %}
+                <li>{{ rank.label_resolved[loop.index0] if rank.label_resolved else label }}</li>
+                {% endfor %}
+            </ol>
+        </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+
+    {% if aggregate_rankings %}
+    <div class="aggregate-rankings">
+        <h4>Aggregate Rankings (Street Cred)</h4>
+        <p class="stage-description">
+            Combined results across all peer evaluations (lower score is better):
+        </p>
+        <div class="aggregate-list">
+            {% for agg in aggregate_rankings %}
+            <div class="aggregate-item">
+                <span class="rank-position">#{{ loop.index }}</span>
+                <span class="rank-model">{{ agg.short_name }}</span>
+                <span class="rank-score">Avg: {{ "%.2f" | format(agg.average_rank) }}</span>
+                <span class="rank-count">({{ agg.rankings_count }} votes)</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
