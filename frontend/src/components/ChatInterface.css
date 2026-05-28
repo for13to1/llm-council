@@ -161,3 +161,27 @@
   background: #ccc;
   border-color: #ccc;
 }
+
+.error-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px 16px;
+  margin-bottom: 8px;
+  background: #fff0f0;
+  border: 1px solid #e74c3c;
+  border-radius: 8px;
+  color: #c0392b;
+  font-size: 14px;
+}
+
+.error-dismiss {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: #c0392b;
+  padding: 0 4px;
+  line-height: 1;
+}

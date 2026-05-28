@@ -57,7 +57,7 @@ function initSendMessage() {
             '<div class="user-message">' +
             '<div class="message-label">You</div>' +
             '<div class="message-content"><div class="markdown-content">' +
-            escapeHtml(content) +
+            marked.parse(content) +
             '</div></div></div>';
         container.appendChild(userGroup);
 
@@ -101,7 +101,7 @@ function initSendMessage() {
                     if (!line.startsWith('data: ')) continue;
                     try {
                         var event = JSON.parse(line.slice(6));
-                        handleSSEEvent(event, assistantGroup, conversationId);
+                        handleSSEEvent(event, assistantGroup, userGroup, conversationId);
                     } catch (parseErr) {
                         console.error('SSE parse error:', parseErr);
                     }
@@ -112,16 +112,13 @@ function initSendMessage() {
             if (buffer.trim().startsWith('data: ')) {
                 try {
                     var event = JSON.parse(buffer.trim().slice(6));
-                    handleSSEEvent(event, assistantGroup, conversationId);
+                    handleSSEEvent(event, assistantGroup, userGroup, conversationId);
                 } catch (parseErr) { /* ignore */ }
             }
         } catch (err) {
-            var assistantMsg = assistantGroup.querySelector('.assistant-message');
-            var errorDiv = document.createElement('div');
-            errorDiv.className = 'stage-loading';
-            errorDiv.style.borderColor = '#e74c3c';
-            errorDiv.innerHTML = '<span style="color:#e74c3c">Error: ' + escapeHtml(err.message) + '</span>';
-            assistantMsg.appendChild(errorDiv);
+            userGroup.remove();
+            assistantGroup.remove();
+            showErrorNotification(container, 'Error: ' + err.message);
         }
 
         textarea.value = '';
@@ -140,7 +137,7 @@ function initSendMessage() {
 }
 
 /* === SSE Event Handler === */
-function handleSSEEvent(event, assistantGroup, conversationId) {
+function handleSSEEvent(event, assistantGroup, userGroup, conversationId) {
     var assistantMsg = assistantGroup.querySelector('.assistant-message');
 
     switch (event.type) {
@@ -188,12 +185,10 @@ function handleSSEEvent(event, assistantGroup, conversationId) {
             break;
 
         case 'error':
-            removeAllLoaders(assistantMsg);
-            var errorDiv = document.createElement('div');
-            errorDiv.className = 'stage-loading';
-            errorDiv.style.borderColor = '#e74c3c';
-            errorDiv.innerHTML = '<span style="color:#e74c3c">Error: ' + escapeHtml(event.message) + '</span>';
-            assistantMsg.appendChild(errorDiv);
+            userGroup.remove();
+            assistantGroup.remove();
+            var container = document.querySelector('.messages-container');
+            if (container) showErrorNotification(container, 'Error: ' + event.message);
             break;
     }
     scrollToBottom();
@@ -328,6 +323,16 @@ function insertBeforeLoaders(msg, html) {
     }
 }
 
+function showErrorNotification(container, message) {
+    var errorDiv = document.createElement('div');
+    errorDiv.className = 'error-notification';
+    errorDiv.innerHTML =
+        '<span>' + escapeHtml(message) + '</span>' +
+        '<button class="error-dismiss" onclick="this.parentElement.remove()">&times;</button>';
+    container.appendChild(errorDiv);
+    scrollToBottom();
+}
+
 function scrollToBottom() {
     var container = document.querySelector('.messages-container');
     if (container) container.scrollTop = container.scrollHeight;
@@ -337,4 +342,15 @@ function escapeHtml(text) {
     var div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+function deleteConversation(id) {
+    fetch('/api/conversations/' + id, { method: 'DELETE' })
+        .then(function (r) {
+            if (!r.ok) throw new Error('Delete failed');
+            window.location.href = '/';
+        })
+        .catch(function (err) {
+            console.error('Failed to delete conversation:', err);
+        });
 }

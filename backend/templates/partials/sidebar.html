@@ -9,6 +9,7 @@
             <div class="conversation-item {% if conv.id == active_conversation_id %}active{% endif %}" onclick="window.location.href='/conversations/{{ conv.id }}'" data-id="{{ conv.id }}">
                 <div class="conversation-title" id="sidebar-title-{{ conv.id }}">{{ conv.title or 'New Conversation' }}</div>
                 <div class="conversation-meta">{{ conv.message_count }} messages</div>
+                <button class="delete-btn" title="Delete conversation" onclick="event.stopPropagation(); deleteConversation('{{ conv.id }}')">&times;</button>
             </div>
             {% endfor %}
         {% else %}

@@ -9,6 +9,7 @@ function App() {
   const [currentConversationId, setCurrentConversationId] = useState(null);
   const [currentConversation, setCurrentConversation] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState(null);
 
   // Load conversations on mount
   useEffect(() => {
@@ -57,9 +58,23 @@ function App() {
     setCurrentConversationId(id);
   };
 
+  const handleDeleteConversation = async (id) => {
+    try {
+      await api.deleteConversation(id);
+      setConversations((prev) => prev.filter((c) => c.id !== id));
+      if (currentConversationId === id) {
+        setCurrentConversationId(null);
+        setCurrentConversation(null);
+      }
+    } catch (error) {
+      console.error('Failed to delete conversation:', error);
+    }
+  };
+
   const handleSendMessage = async (content) => {
     if (!currentConversationId) return;
 
+    setErrorMessage(null);
     setIsLoading(true);
     try {
       // Optimistically add user message to UI
@@ -163,6 +178,7 @@ function App() {
 
           case 'error':
             console.error('Stream error:', event.message);
+            setErrorMessage(event.message || 'An unknown error occurred');
             setIsLoading(false);
             break;
 
@@ -172,11 +188,14 @@ function App() {
       });
     } catch (error) {
       console.error('Failed to send message:', error);
+      setErrorMessage(error.message || 'Failed to send message');
       // Remove optimistic messages on error
       setCurrentConversation((prev) => ({
         ...prev,
         messages: prev.messages.slice(0, -2),
       }));
+      setIsLoading(false);
+    } finally {
       setIsLoading(false);
     }
   };
@@ -188,11 +207,14 @@ function App() {
         currentConversationId={currentConversationId}
         onSelectConversation={handleSelectConversation}
         onNewConversation={handleNewConversation}
+        onDeleteConversation={handleDeleteConversation}
       />
       <ChatInterface
         conversation={currentConversation}
         onSendMessage={handleSendMessage}
         isLoading={isLoading}
+        errorMessage={errorMessage}
+        onDismissError={() => setErrorMessage(null)}
       />
     </div>
   );

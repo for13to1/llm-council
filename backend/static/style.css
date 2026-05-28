@@ -89,6 +89,7 @@ body {
 }
 
 .conversation-item {
+  position: relative;
   padding: 12px;
   margin-bottom: 4px;
   border-radius: 6px;
@@ -114,6 +115,34 @@ body {
 .conversation-meta {
   color: #999;
   font-size: 12px;
+}
+
+.delete-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  color: #999;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.conversation-item:hover .delete-btn {
+  display: flex;
+}
+
+.delete-btn:hover {
+  background: #e0e0e0;
+  color: #e74c3c;
 }
 
 /* === Chat Interface === */
@@ -601,4 +630,27 @@ body {
 /* === Utility === */
 .hidden {
   display: none;
+}
+
+.error-notification {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  margin: 12px 24px;
+  background: #fff0f0;
+  border: 1px solid #e74c3c;
+  border-radius: 8px;
+  color: #c0392b;
+  font-size: 14px;
+}
+
+.error-dismiss {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: #c0392b;
+  padding: 0 4px;
+  line-height: 1;
 }

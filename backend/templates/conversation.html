@@ -9,7 +9,7 @@
                 <div class="user-message">
                     <div class="message-label">You</div>
                     <div class="message-content">
-                        <div class="markdown-content">{{ msg.content }}</div>
+                        <div class="markdown-content">{{ processed_messages[loop.index0].content_html | safe }}</div>
                     </div>
                 </div>
                 {% else %}

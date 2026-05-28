@@ -61,7 +61,10 @@ def prepare_messages_for_template(messages: List[Dict[str, Any]]) -> Dict[int, D
     processed = {}
     for idx, msg in enumerate(messages):
         if msg["role"] == "user":
-            continue
+            processed[idx] = {
+                "role": "user",
+                "content_html": render_markdown(msg["content"]),
+            }
         else:
             p = {"role": "assistant", "stage1": None, "stage2": None, "stage3": None,
                  "aggregate_rankings": None}
@@ -259,6 +262,15 @@ async def send_message(conversation_id: str, request: SendMessageRequest):
         "stage3": stage3_result,
         "metadata": metadata
     }
+
+
+@app.delete("/api/conversations/{conversation_id}")
+async def delete_conversation(conversation_id: str):
+    """Delete a conversation."""
+    deleted = storage.delete_conversation(conversation_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    return {"ok": True}
 
 
 @app.post("/api/conversations/{conversation_id}/message/stream")
