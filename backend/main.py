@@ -4,6 +4,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 import uuid
@@ -15,6 +16,14 @@ from . import storage
 from .council import run_full_council, generate_conversation_title, stage1_collect_responses, stage2_collect_rankings, stage3_synthesize_final, calculate_aggregate_rankings
 
 app = FastAPI(title="LLM Council API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Static files and templates
 app.mount("/static", StaticFiles(directory="backend/static"), name="static")
@@ -141,8 +150,7 @@ class Conversation(BaseModel):
 async def root(request: Request):
     """Landing page."""
     conversations = storage.list_conversations()
-    return templates.TemplateResponse("index.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "index.html", {
         "conversations": conversations,
         "active_conversation_id": None,
     })
@@ -167,16 +175,14 @@ async def view_conversation(request: Request, conversation_id: str):
 
     if len(conversation["messages"]) == 0:
         # Empty conversation — show input form
-        return templates.TemplateResponse("index.html", {
-            "request": request,
+        return templates.TemplateResponse(request, "index.html", {
             "conversations": conversations,
             "active_conversation_id": conversation_id,
         })
 
     processed_messages = prepare_messages_for_template(conversation["messages"])
 
-    return templates.TemplateResponse("conversation.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "conversation.html", {
         "conversations": conversations,
         "active_conversation_id": conversation_id,
         "conversation": conversation,
