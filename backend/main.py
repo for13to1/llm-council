@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import os
 import uuid
 from typing import Any
 
@@ -42,7 +43,8 @@ templates = Jinja2Templates(directory="backend/templates")
 
 
 def short_model_name(model: str) -> str:
-    return model.split("/")[1] if "/" in model else model
+    parts = model.split("/")
+    return "/".join(parts[1:]) if len(parts) > 1 else model
 
 
 def render_markdown(text: str) -> str:
@@ -376,5 +378,15 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
 
 if __name__ == "__main__":
     import uvicorn
+
+    from .config import COUNCIL_MODELS, PROVIDERS
+
+    # Warn about missing API keys at startup
+    required_providers = {m["provider"] for m in COUNCIL_MODELS}
+    for provider_name in sorted(required_providers):
+        provider_cfg = PROVIDERS.get(provider_name, {})
+        api_key_env = provider_cfg.get("api_key_env", "")
+        if api_key_env and not os.environ.get(api_key_env):
+            print(f"WARNING: {api_key_env} is not set -- {provider_name} models will fail.")
 
     uvicorn.run(app, host="0.0.0.0", port=8001)

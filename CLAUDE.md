@@ -11,16 +11,20 @@ LLM Council is a 3-stage deliberation system where multiple LLMs collaboratively
 ### Backend Structure (`backend/`)
 
 **`config.py`**
-- Contains `COUNCIL_MODELS` (list of OpenRouter model identifiers)
-- Contains `CHAIRMAN_MODEL` (model that synthesizes final answer)
-- Uses environment variable `OPENROUTER_API_KEY` from `.env`
-- Backend runs on **port 8001** (NOT 8000 - user had another app on 8000)
+- Contains `PROVIDERS` dict — unified provider definitions (OpenRouter, OpenAI, Anthropic, Google, xAI, DeepSeek, Ollama)
+- `COUNCIL_MODELS` / `CHAIRMAN_MODEL` / `TITLE_MODEL` — all dict format: `{"provider": "...", "model": "..."}`
+- Each provider's `base_url` overridable via `{PROVIDER}_BASE_URL` env var
+- Anthropic provider uses `api_format: "anthropic"` for native Messages API (different auth + request/response format)
+- `model_display_name()` strips routing prefix: `openrouter` + `openai/gpt-5.1` → `"openrouter/gpt-5.1"`
+- Backend runs on **port 8001**
 
-**`openrouter.py`**
-- `query_model()`: Single async model query
+**`llm_client.py`**
+- `resolve_provider()`: Looks up provider config from `PROVIDERS` dict, returns url/api_key/model_id/extra_headers/api_format
+- `query_model()`: Single async model query — handles both OpenAI-compatible and Anthropic formats
 - `query_models_parallel()`: Parallel queries using `asyncio.gather()`
 - Returns dict with 'content' and optional 'reasoning_details'
 - Graceful degradation: returns None on failure, continues with successful responses
+- Anthropic adapter: `_build_anthropic_payload()` converts messages, `_parse_anthropic_response()` normalizes output
 
 **`council.py`** - The Core Logic
 - `stage1_collect_responses()`: Parallel queries to all council models
@@ -37,20 +41,23 @@ LLM Council is a 3-stage deliberation system where multiple LLMs collaboratively
 **`storage.py`**
 - JSON-based conversation storage in `data/conversations/`
 - Each conversation: `{id, created_at, messages[]}`
-- Assistant messages contain: `{role, stage1, stage2, stage3}`
-- Note: metadata (label_to_model, aggregate_rankings) is NOT persisted to storage, only returned via API
+- Assistant messages contain: `{role, stage1, stage2, stage3, label_to_model, aggregate_rankings}`
+- Metadata (label_to_model, aggregate_rankings) IS persisted with each assistant message
 
 **`main.py`**
-- FastAPI app with CORS enabled for localhost:5173 and localhost:3000
+- FastAPI app with CORS enabled for all origins (`allow_origins=["*"]`)
 - POST `/api/conversations/{id}/message` returns metadata in addition to stages
+- POST `/api/conversations/{id}/message/stream` — SSE streaming endpoint (primary for frontend)
 - Metadata includes: label_to_model mapping and aggregate_rankings
 
 ### Frontend Structure (`frontend/src/`)
 
+**`utils.js`**
+- Exports `shortModelName()` — strips provider prefix from display name (e.g. `"openrouter/gpt-5.1"` → `"gpt-5.1"`)
+
 **`App.jsx`**
 - Main orchestration: manages conversations list and current conversation
 - Handles message sending and metadata storage
-- Important: metadata is stored in the UI state for display but not persisted to backend JSON
 
 **`components/ChatInterface.jsx`**
 - Multiline textarea (3 rows, resizable)
@@ -66,6 +73,7 @@ LLM Council is a 3-stage deliberation system where multiple LLMs collaboratively
 - De-anonymization happens CLIENT-SIDE for display (models receive anonymous labels)
 - Shows "Extracted Ranking" below each evaluation so users can validate parsing
 - Aggregate rankings shown with average position and vote count
+- Uses `shortModelName()` from `utils.js` for display names
 - Explanatory text clarifies that boldface model names are for readability only
 
 **`components/Stage3.jsx`**
@@ -93,8 +101,9 @@ This strict format allows reliable parsing while still getting thoughtful evalua
 
 ### De-anonymization Strategy
 - Models receive: "Response A", "Response B", etc.
-- Backend creates mapping: `{"Response A": "openai/gpt-5.1", ...}`
-- Frontend displays model names in **bold** for readability
+- Backend creates mapping: `{"Response A": "openrouter/gpt-5.1", ...}`
+- `short_model_name()` strips provider prefix for display: `"gpt-5.1"`
+- Frontend uses `shortModelName()` from `utils.js` for the same
 - Users see explanation that original evaluation used anonymous labels
 - This prevents bias while maintaining transparency
 
@@ -123,19 +132,18 @@ All backend modules use relative imports (e.g., `from .config import ...`) not a
 All ReactMarkdown components must be wrapped in `<div className="markdown-content">` for proper spacing. This class is defined globally in `index.css`.
 
 ### Model Configuration
-Models are hardcoded in `backend/config.py`. Chairman can be same or different from council members. The current default is Gemini as chairman per user preference.
+Models are configured in `backend/config.py` as dicts: `{"provider": "openrouter", "model": "openai/gpt-5.1"}`. Chairman can be same or different from council members. Providers are defined in the `PROVIDERS` dict — each has `base_url`, `api_key_env`, optional `extra_headers` and `api_format`.
 
 ## Common Gotchas
 
 1. **Module Import Errors**: Always run backend as `python -m backend.main` from project root, not from backend directory
 2. **CORS Issues**: Frontend must match allowed origins in `main.py` CORS middleware
 3. **Ranking Parse Failures**: If models don't follow format, fallback regex extracts any "Response X" patterns in order
-4. **Missing Metadata**: Metadata is ephemeral (not persisted), only available in API responses
+4. **Missing Metadata**: Metadata (label_to_model, aggregate_rankings) is persisted with each assistant message, but old conversations created before this feature may lack it
 
 ## Future Enhancement Ideas
 
 - Configurable council/chairman via UI instead of config file
-- Streaming responses instead of batch loading
 - Export conversations to markdown/PDF
 - Model performance analytics over time
 - Custom ranking criteria (not just accuracy/insight)
@@ -143,7 +151,7 @@ Models are hardcoded in `backend/config.py`. Chairman can be same or different f
 
 ## Testing Notes
 
-Use `test_openrouter.py` to verify API connectivity and test different model identifiers before adding to council. The script tests both streaming and non-streaming modes.
+No test suite exists. Verify changes manually by running the app and submitting a query.
 
 ## Data Flow Summary
 

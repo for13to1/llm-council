@@ -7,7 +7,7 @@
     </div>
     {% for resp in stage1_responses %}
     <div class="tab-content {% if not loop.first %}hidden{% endif %}" data-stage="stage1" data-tab-index="{{ loop.index0 }}">
-        <div class="model-name">{{ resp.model }}</div>
+        <div class="model-name">{{ resp.short_name }}</div>
         <div class="response-text markdown-content">{{ resp.response_html | safe }}</div>
     </div>
     {% endfor %}

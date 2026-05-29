@@ -2,7 +2,7 @@
 
 ![llmcouncil](header.jpg)
 
-The idea of this repo is that instead of asking a question to your favorite LLM provider (e.g. OpenAI GPT 5.1, Google Gemini 3.0 Pro, Anthropic Claude Sonnet 4.5, xAI Grok 4, eg.c), you can group them into your "LLM Council". This repo is a simple, local web app that essentially looks like ChatGPT except it uses OpenRouter to send your query to multiple LLMs, it then asks them to review and rank each other's work, and finally a Chairman LLM produces the final response.
+The idea of this repo is that instead of asking a question to your favorite LLM provider (e.g. OpenAI GPT 5.5, Google Gemini 3.5 Flash, Anthropic Claude Opus 4.8, xAI Grok 4.3, etc.), you can group them into your "LLM Council". This repo is a simple, local web app that essentially looks like ChatGPT except it sends your query to multiple LLMs (via OpenRouter or directly to each provider), it then asks them to review and rank each other's work, and finally a Chairman LLM produces the final response.
 
 In a bit more detail, here is what happens when you submit a query:
 
@@ -34,27 +34,33 @@ cd ..
 
 ### 2. Configure API Key
 
-Create a `.env` file in the project root:
+Create a `.env` file in the project root. You can copy the example:
 
 ```bash
+cp .env.example .env
+```
+
+The simplest way to get started is with [OpenRouter](https://openrouter.ai/) — one key gives access to all models:
+
+```
 OPENROUTER_API_KEY=sk-or-v1-...
 ```
 
-Get your API key at [openrouter.ai](https://openrouter.ai/). Make sure to purchase the credits you need, or sign up for automatic top up.
+You can also use providers directly (OpenAI, Anthropic, Google, xAI, DeepSeek, Ollama) by setting their API keys. See `.env.example` for all options.
 
 ### 3. Configure Models (Optional)
 
-Edit `backend/config.py` to customize the council:
+Edit `backend/config.py` to customize the council. Each model specifies which provider to use:
 
 ```python
 COUNCIL_MODELS = [
-    "openai/gpt-5.1",
-    "google/gemini-3-pro-preview",
-    "anthropic/claude-sonnet-4.5",
-    "x-ai/grok-4",
+    {"provider": "openrouter", "model": "openai/gpt-5.5"},
+    {"provider": "openrouter", "model": "google/gemini-3.5-flash"},
+    {"provider": "openai", "model": "gpt-4o"},           # direct
+    {"provider": "ollama", "model": "qwen3:8b"},         # local
 ]
 
-CHAIRMAN_MODEL = "google/gemini-3-pro-preview"
+CHAIRMAN_MODEL = {"provider": "openrouter", "model": "anthropic/claude-opus-4.8"}
 ```
 
 ## Running the Application
@@ -81,7 +87,7 @@ Then open http://localhost:5173 in your browser.
 
 ## Tech Stack
 
-- **Backend:** FastAPI (Python 3.10+), async httpx, OpenRouter API
-- **Frontend:** React + Vite, react-markdown for rendering
+- **Backend:** FastAPI (Python 3.14), async httpx, multi-provider LLM support
+- **Frontend:** React 19 + Vite 7, react-markdown for rendering
 - **Storage:** JSON files in `data/conversations/`
 - **Package Management:** uv for Python, npm for JavaScript

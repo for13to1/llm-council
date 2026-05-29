@@ -3,6 +3,11 @@ document.addEventListener('DOMContentLoaded', function () {
     initSendMessage();
 });
 
+function shortModelName(model) {
+    var idx = model.indexOf('/');
+    return idx !== -1 ? model.substring(idx + 1) : model;
+}
+
 /* === Tab Switching === */
 function initTabSwitching() {
     document.body.addEventListener('click', function (e) {
@@ -149,7 +154,6 @@ function handleSSEEvent(event, assistantGroup, userGroup, conversationId) {
             hideStageLoading(assistantMsg, 1);
             var s1Html = renderStage1(event.data);
             insertBeforeLoaders(assistantMsg, s1Html);
-            showStageLoading(assistantMsg, 2);
             break;
 
         case 'stage2_start':
@@ -162,7 +166,6 @@ function handleSSEEvent(event, assistantGroup, userGroup, conversationId) {
             var aggregateRankings = event.metadata ? event.metadata.aggregate_rankings : null;
             var s2Html = renderStage2(event.data, labelToModel, aggregateRankings);
             insertBeforeLoaders(assistantMsg, s2Html);
-            showStageLoading(assistantMsg, 3);
             break;
 
         case 'stage3_start':
@@ -201,10 +204,10 @@ function renderStage1(responses) {
     var contents = '';
     for (var i = 0; i < responses.length; i++) {
         var r = responses[i];
-        var shortName = r.model.split('/')[1] || r.model;
+        var shortName = shortModelName(r.model);
         tabs += '<button class="tab' + (i === 0 ? ' active' : '') + '" data-stage="stage1" data-tab="' + i + '">' + escapeHtml(shortName) + '</button>';
         contents += '<div class="tab-content' + (i === 0 ? '' : ' hidden') + '" data-stage="stage1" data-tab-index="' + i + '">' +
-            '<div class="model-name">' + escapeHtml(r.model) + '</div>' +
+            '<div class="model-name">' + escapeHtml(shortName) + '</div>' +
             '<div class="response-text markdown-content">' + marked.parse(r.response || '') + '</div>' +
             '</div>';
     }
@@ -220,7 +223,7 @@ function renderStage2(rankings, labelToModel, aggregateRankings) {
     var contents = '';
     for (var i = 0; i < rankings.length; i++) {
         var r = rankings[i];
-        var shortName = r.model.split('/')[1] || r.model;
+        var shortName = shortModelName(r.model);
         tabs += '<button class="tab' + (i === 0 ? ' active' : '') + '" data-stage="stage2" data-tab="' + i + '">' + escapeHtml(shortName) + '</button>';
 
         var rankingText = deAnonymizeText(r.ranking || '', labelToModel);
@@ -230,7 +233,7 @@ function renderStage2(rankings, labelToModel, aggregateRankings) {
             for (var j = 0; j < r.parsed_ranking.length; j++) {
                 var label = r.parsed_ranking[j];
                 var resolved = (labelToModel && labelToModel[label])
-                    ? (labelToModel[label].split('/')[1] || labelToModel[label])
+                    ? shortModelName(labelToModel[label])
                     : label;
                 parsedHtml += '<li>' + escapeHtml(resolved) + '</li>';
             }
@@ -238,7 +241,7 @@ function renderStage2(rankings, labelToModel, aggregateRankings) {
         }
 
         contents += '<div class="tab-content' + (i === 0 ? '' : ' hidden') + '" data-stage="stage2" data-tab-index="' + i + '">' +
-            '<div class="ranking-model">' + escapeHtml(r.model) + '</div>' +
+            '<div class="ranking-model">' + escapeHtml(shortName) + '</div>' +
             '<div class="ranking-content markdown-content">' + marked.parse(rankingText) + '</div>' +
             parsedHtml + '</div>';
     }
@@ -251,7 +254,7 @@ function renderStage2(rankings, labelToModel, aggregateRankings) {
             '<div class="aggregate-list">';
         for (var k = 0; k < aggregateRankings.length; k++) {
             var agg = aggregateRankings[k];
-            var aggShort = agg.model.split('/')[1] || agg.model;
+            var aggShort = shortModelName(agg.model);
             aggregateHtml += '<div class="aggregate-item">' +
                 '<span class="rank-position">#' + (k + 1) + '</span>' +
                 '<span class="rank-model">' + escapeHtml(aggShort) + '</span>' +
@@ -272,7 +275,7 @@ function renderStage2(rankings, labelToModel, aggregateRankings) {
 
 function renderStage3(result) {
     if (!result) return '';
-    var shortName = result.model.split('/')[1] || result.model;
+    var shortName = shortModelName(result.model);
     return '<div class="stage stage3">' +
         '<h3 class="stage-title">Stage 3: Final Council Answer</h3>' +
         '<div class="final-response">' +
@@ -289,7 +292,7 @@ function deAnonymizeText(text, labelToModel) {
     for (var i = 0; i < labels.length; i++) {
         var label = labels[i];
         var model = labelToModel[label];
-        var shortName = model.split('/')[1] || model;
+        var shortName = shortModelName(model);
         result = result.split(label).join('**' + shortName + '**');
     }
     return result;

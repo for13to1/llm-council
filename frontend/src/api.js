@@ -127,7 +127,8 @@ export const api = {
       reader.releaseLock();
     }
   },
-/**
+
+  /**
    * Delete a conversation.
    */
   async deleteConversation(conversationId) {

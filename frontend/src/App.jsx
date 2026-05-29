@@ -173,13 +173,11 @@ function App() {
           case 'complete':
             // Stream complete, reload conversations list
             loadConversations();
-            setIsLoading(false);
             break;
 
           case 'error':
             console.error('Stream error:', event.message);
             setErrorMessage(event.message || 'An unknown error occurred');
-            setIsLoading(false);
             break;
 
           default:
@@ -200,7 +198,6 @@ function App() {
         }
         return { ...prev, messages };
       });
-      setIsLoading(false);
     } finally {
       setIsLoading(false);
     }

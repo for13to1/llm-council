@@ -1,15 +1,15 @@
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
+import { shortModelName } from '../utils';
 import './Stage2.css';
 
 function deAnonymizeText(text, labelToModel) {
   if (!labelToModel) return text;
 
   let result = text;
-  // Replace each "Response X" with the actual model name
   Object.entries(labelToModel).forEach(([label, model]) => {
-    const modelShortName = model.split('/')[1] || model;
-    result = result.replace(new RegExp(label, 'g'), `**${modelShortName}**`);
+    // Use split/join instead of RegExp to avoid issues with special characters in label
+    result = result.split(label).join(`**${shortModelName(model)}**`);
   });
   return result;
 }
@@ -38,14 +38,14 @@ export default function Stage2({ rankings, labelToModel, aggregateRankings }) {
             className={`tab ${activeTab === index ? 'active' : ''}`}
             onClick={() => setActiveTab(index)}
           >
-            {rank.model.split('/')[1] || rank.model}
+            {shortModelName(rank.model)}
           </button>
         ))}
       </div>
 
       <div className="tab-content">
         <div className="ranking-model">
-          {rankings[activeTab].model}
+          {shortModelName(rankings[activeTab].model)}
         </div>
         <div className="ranking-content markdown-content">
           <ReactMarkdown>
@@ -61,7 +61,7 @@ export default function Stage2({ rankings, labelToModel, aggregateRankings }) {
               {rankings[activeTab].parsed_ranking.map((label, i) => (
                 <li key={i}>
                   {labelToModel && labelToModel[label]
-                    ? labelToModel[label].split('/')[1] || labelToModel[label]
+                    ? shortModelName(labelToModel[label])
                     : label}
                 </li>
               ))}
@@ -81,7 +81,7 @@ export default function Stage2({ rankings, labelToModel, aggregateRankings }) {
               <div key={index} className="aggregate-item">
                 <span className="rank-position">#{index + 1}</span>
                 <span className="rank-model">
-                  {agg.model.split('/')[1] || agg.model}
+                  {shortModelName(agg.model)}
                 </span>
                 <span className="rank-score">
                   Avg: {agg.average_rank.toFixed(2)}

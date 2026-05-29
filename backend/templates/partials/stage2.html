@@ -15,7 +15,7 @@
 
     {% for rank in stage2_rankings %}
     <div class="tab-content {% if not loop.first %}hidden{% endif %}" data-stage="stage2" data-tab-index="{{ loop.index0 }}">
-        <div class="ranking-model">{{ rank.model }}</div>
+        <div class="ranking-model">{{ rank.short_name }}</div>
         <div class="ranking-content markdown-content">{{ rank.ranking_html | safe }}</div>
         {% if rank.parsed_ranking %}
         <div class="parsed-ranking">

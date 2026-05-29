@@ -1,7 +1,9 @@
 """JSON-based storage for conversations."""
 
+import contextlib
 import json
 import os
+import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -17,6 +19,22 @@ def ensure_data_dir():
 def get_conversation_path(conversation_id: str) -> str:
     """Get the file path for a conversation."""
     return os.path.join(DATA_DIR, f"{conversation_id}.json")
+
+
+def _atomic_write_json(path: str, data: Any):
+    """Write JSON atomically using a temp file + rename to prevent corruption."""
+    dir_name = os.path.dirname(path)
+    fd, tmp_path = tempfile.mkstemp(suffix=".tmp", dir=dir_name)
+    try:
+        with os.fdopen(fd, "w") as f:
+            json.dump(data, f, indent=2)
+        # On Windows, os.replace is atomic and overwrites the target
+        os.replace(tmp_path, path)
+    except BaseException:
+        # Clean up temp file on failure
+        with contextlib.suppress(OSError):
+            os.unlink(tmp_path)
+        raise
 
 
 def create_conversation(conversation_id: str) -> dict[str, Any]:
@@ -40,8 +58,7 @@ def create_conversation(conversation_id: str) -> dict[str, Any]:
 
     # Save to file
     path = get_conversation_path(conversation_id)
-    with open(path, "w") as f:
-        json.dump(conversation, f, indent=2)
+    _atomic_write_json(path, conversation)
 
     return conversation
 
@@ -75,8 +92,7 @@ def save_conversation(conversation: dict[str, Any]):
     ensure_data_dir()
 
     path = get_conversation_path(conversation["id"])
-    with open(path, "w") as f:
-        json.dump(conversation, f, indent=2)
+    _atomic_write_json(path, conversation)
 
 
 def delete_conversation(conversation_id: str) -> bool:
