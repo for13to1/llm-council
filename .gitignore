@@ -5,6 +5,8 @@ build/
 dist/
 wheels/
 *.egg-info
+.ruff_cache/
+.pytest_cache/
 
 # Virtual environments
 .venv
@@ -22,3 +24,5 @@ frontend/.vite/
 
 # IDE and OS files
 .DS_Store
+.idea/
+.vscode/
