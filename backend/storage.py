@@ -30,7 +30,7 @@ def _atomic_write_json(path: str, data: Any):
             json.dump(data, f, indent=2)
         # On Windows, os.replace is atomic and overwrites the target
         os.replace(tmp_path, path)
-    except BaseException:
+    except Exception:
         # Clean up temp file on failure
         with contextlib.suppress(OSError):
             os.unlink(tmp_path)

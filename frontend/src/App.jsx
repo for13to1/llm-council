@@ -110,8 +110,8 @@ function App() {
           case 'stage1_start':
             setCurrentConversation((prev) => {
               const messages = [...prev.messages];
-              const lastMsg = messages[messages.length - 1];
-              lastMsg.loading.stage1 = true;
+              const lastMsg = { ...messages[messages.length - 1], loading: { ...messages[messages.length - 1].loading, stage1: true } };
+              messages[messages.length - 1] = lastMsg;
               return { ...prev, messages };
             });
             break;
@@ -119,9 +119,8 @@ function App() {
           case 'stage1_complete':
             setCurrentConversation((prev) => {
               const messages = [...prev.messages];
-              const lastMsg = messages[messages.length - 1];
-              lastMsg.stage1 = event.data;
-              lastMsg.loading.stage1 = false;
+              const lastMsg = { ...messages[messages.length - 1], stage1: event.data, loading: { ...messages[messages.length - 1].loading, stage1: false } };
+              messages[messages.length - 1] = lastMsg;
               return { ...prev, messages };
             });
             break;
@@ -129,8 +128,8 @@ function App() {
           case 'stage2_start':
             setCurrentConversation((prev) => {
               const messages = [...prev.messages];
-              const lastMsg = messages[messages.length - 1];
-              lastMsg.loading.stage2 = true;
+              const lastMsg = { ...messages[messages.length - 1], loading: { ...messages[messages.length - 1].loading, stage2: true } };
+              messages[messages.length - 1] = lastMsg;
               return { ...prev, messages };
             });
             break;
@@ -138,10 +137,8 @@ function App() {
           case 'stage2_complete':
             setCurrentConversation((prev) => {
               const messages = [...prev.messages];
-              const lastMsg = messages[messages.length - 1];
-              lastMsg.stage2 = event.data;
-              lastMsg.metadata = event.metadata;
-              lastMsg.loading.stage2 = false;
+              const lastMsg = { ...messages[messages.length - 1], stage2: event.data, metadata: event.metadata, loading: { ...messages[messages.length - 1].loading, stage2: false } };
+              messages[messages.length - 1] = lastMsg;
               return { ...prev, messages };
             });
             break;
@@ -149,8 +146,8 @@ function App() {
           case 'stage3_start':
             setCurrentConversation((prev) => {
               const messages = [...prev.messages];
-              const lastMsg = messages[messages.length - 1];
-              lastMsg.loading.stage3 = true;
+              const lastMsg = { ...messages[messages.length - 1], loading: { ...messages[messages.length - 1].loading, stage3: true } };
+              messages[messages.length - 1] = lastMsg;
               return { ...prev, messages };
             });
             break;
@@ -158,9 +155,8 @@ function App() {
           case 'stage3_complete':
             setCurrentConversation((prev) => {
               const messages = [...prev.messages];
-              const lastMsg = messages[messages.length - 1];
-              lastMsg.stage3 = event.data;
-              lastMsg.loading.stage3 = false;
+              const lastMsg = { ...messages[messages.length - 1], stage3: event.data, loading: { ...messages[messages.length - 1].loading, stage3: false } };
+              messages[messages.length - 1] = lastMsg;
               return { ...prev, messages };
             });
             break;
@@ -178,6 +174,22 @@ function App() {
           case 'error':
             console.error('Stream error:', event.message);
             setErrorMessage(event.message || 'An unknown error occurred');
+            // Clear all loading states in the partial assistant message
+            setCurrentConversation((prev) => {
+              const messages = [...prev.messages];
+              const lastMsg = messages[messages.length - 1];
+              if (lastMsg?.loading) {
+                messages[messages.length - 1] = { ...lastMsg, loading: { stage1: false, stage2: false, stage3: false } };
+              }
+              // Remove optimistic messages (user + failed assistant pair)
+              if (messages.length >= 2 && messages[messages.length - 1]?.role === 'assistant' && !messages[messages.length - 1]?.stage3) {
+                messages.pop();
+              }
+              if (messages.length >= 1 && messages[messages.length - 1]?.role === 'user') {
+                messages.pop();
+              }
+              return { ...prev, messages };
+            });
             break;
 
           default:

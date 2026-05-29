@@ -322,6 +322,10 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
             stage1_results = await stage1_collect_responses(request.content)
             yield f"data: {json.dumps({'type': 'stage1_complete', 'data': stage1_results})}\n\n"
 
+            # If no models responded, abort early
+            if not stage1_results:
+                raise RuntimeError("All models failed to respond. Please check your API keys and try again.")
+
             # Stage 2: Collect rankings
             yield f"data: {json.dumps({'type': 'stage2_start'})}\n\n"
             stage2_results, label_to_model = await stage2_collect_rankings(request.content, stage1_results)
